@@ -1,24 +1,38 @@
 import express from "express";
-import { registerUser, loginUser } from "../controllers/authController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import {
+  register,
+  login,
+  logout,
+} from "../controllers/authController.js";
+import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Register
-router.post("/register", registerUser);
+// ─── Public Routes ─────────────────────────────────────────────────────────────
+router.post("/register", register);
+router.post("/login", login);
+router.post("/logout", logout); // logout controller already handles cookie clear
 
-// Login
-router.post("/login", loginUser);
-
-// Logout
-router.post("/logout", (req, res) => {
-  res.clearCookie("token");
-  res.json({ message: "Logged out" });
+// ─── Protected Routes ──────────────────────────────────────────────────────────
+router.get("/me", protect, (req, res) => {
+  return res.status(200).json({
+    success: true,
+    user: req.user,
+  });
 });
 
-// Get current user
-router.get("/me", protect, (req, res) => {
-  res.json(req.user);
+// ─── Admin Only Routes ─────────────────────────────────────────────────────────
+router.get("/users", protect, restrictTo("admin"), async (req, res) => {
+  try {
+    const users = await User.findActiveUsers(); // static method from model
+    return res.status(200).json({
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 export default router;
